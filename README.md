@@ -5,7 +5,7 @@ Free personal/non-commercial EV trip planner for Turkey. Public app: https://att
 ## Run
 `python3 -m http.server 4173 --directory dist`
 
-`node --test tests/*.test.mjs` — 31 tests. No build step, framework or API keys.
+`node --test tests/*.test.mjs` — 34 tests. No build step, framework or API keys.
 
 ## Current functionality
 - OpenFreeMap / MapLibre road map, Photon address autocomplete and browser current location.
@@ -38,6 +38,15 @@ No billing setup, keys, paid fallback, backend storage or account. Preferences s
 `engine.mjs` retains the old sample optimizer for development/tests. The UI does not run that fixture. `google.mjs` is historical unused code; do not connect billed APIs without explicit owner authorization.
 
 ## Vehicle profiles
-“My vehicle” manages up to 30 editable profiles saved in localStorage (`ev-route-vehicles-v1`). Existing capacity/consumption migrate into the Atto 3 starter profile. No verified manufacturer catalogue is claimed. Profiles contain name/year, usable capacity, baseline highway consumption, car weight excluding occupants, AC/DC limits and supported connectors (CCS2 / Type 2). Switching updates energy, payload-sensitive terrain, SOC and charger compatibility; existing charging plans are invalidated and replanned. Route distance and traffic-free road time do not change merely because a different car is selected. Reset preserves the active vehicle. The main consumption input updates that profile.
+“My vehicle” manages up to 30 editable profiles saved in localStorage (`ev-route-vehicles-v1`). Existing capacity/consumption migrate into the Atto 3 starter profile. The bundled catalogue is community-sourced, with a separately checked BYD Turkey entry; no universal verified manufacturer catalogue is claimed. Profiles contain name/year, usable capacity, baseline highway consumption, car weight excluding occupants, AC/DC limits and supported connectors (CCS2 / Type 2). Switching updates energy, payload-sensitive terrain, SOC and charger compatibility; existing charging plans are invalidated and replanned. Route distance and traffic-free road time do not change merely because a different car is selected. Reset preserves the active vehicle. The main consumption input updates that profile.
 
 `vehicles.mjs` validates and migrates profiles. Charging taper is a generic curve scaled to the profile DC limit; AC uses its separate limit. A mixed station with only a site maximum has unknown AC power, avoiding use of DC power for AC estimates. No cross-device sync. Browser storage denial means session-only profiles.
+
+## Automatic vehicle catalogue
+Choose brand → model → exact model year → version/battery in My vehicle. Selecting a version automatically fills every profile field; Save & use applies it. Specifications stay under an optional disclosure. Existing profiles remain intact; selecting a previously saved catalogue ID updates that profile only when saved. The trip speed slider remains independent and adjustable. 130 km/h is only the stored consumption reference, not a fixed driving speed.
+
+`vehicle-catalog.json` contains 583 variants across 31 brands: complete CCS2 records with European-market coverage from OpenEV Data v1.24.0 (generated 2025-12-30), plus BYD Türkiye’s 2025 Atto 3 Design. Imported 2026-11-05. No live API, billing or key. Not all brands/years are available; never substitute a nearby year or different battery. Community specifications can be wrong or differ from Turkish trims. Incomplete/unsupported/non-European records are excluded.
+
+OpenEV data is redistributed with `dist/vehicle-data-license.txt` (CDLA-Permissive-2.0). Source release: https://github.com/open-ev-data/open-ev-data-dataset/releases/tag/v1.24.0 . Refresh deliberately: download that release JSON and run `python3 import-vehicles.py /path/to/open-ev-data-v1.24.0.json`; review source/schema/license before upgrading. Do not execute downloaded code. Tests validate every resulting record and exact-year filtering.
+
+Highway consumption is NOT WLTP consumption: the importer estimates a reference at130 km/h from drag area (Cd × width × height ×0.84 where known, otherwise0.70 m²), air density1.225, rolling resistance0.01, drivetrain efficiency0.90, auxiliary0.7kW, and75kg driver. This generic estimate is visibly labelled and user-editable. Preserve the existing speed adjustment model. BYD TR uses the earlier23kWh/100km highway assumption; its official16.0 WLTP combined is only context. Brochure lists60.48kWh without separating usable capacity, so that is explicitly a planning assumption; DC110kW, AC11kW, mass1750kg are from the1July2025 brochure. Existing manual Atto profiles are not silently overwritten.
