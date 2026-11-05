@@ -7,18 +7,18 @@ Read README.md and AGENTS.md. Keep the app free; do not enable billing, paid API
 - trip.mjs: OSRM road request and baseline metric validation.
 - terrain.mjs: road-distance resampling, Open-Meteo elevation, payload-dependent terrain energy and SOC trace.
 - chargers.mjs: regional eŞarjRadar/EPDK requests, dated registry metadata, strict network/connector/power filtering.
-- planner.mjs: bounded forward greedy stop selection (90% level-road candidate reach, 8 km spacing to avoid a cluster crowding out earlier stops); actual routed/elevation-checked legs; floor max(20,reserve)+buffer; charge to100%; max6 stops/24 route checks. No claim of global optimum or exhaustive feasibility.
+- planner.mjs: bounded forward greedy stop selection (90% level-road candidate reach, 8 km spacing to avoid a cluster crowding out earlier stops); actual routed/elevation-checked legs; floor max(20,reserve)+buffer; charge to selected80%/100%; max6 stops/24 route checks. No claim of global optimum or exhaustive feasibility.
 - free-map.mjs/search.mjs: OpenFreeMap pins/road line, Photon autocomplete.
 - export.mjs: complete ordered Google URL export, mobile waypoint limits.
 - engine.mjs: existing consumption/charge model and historical sample optimizer. google.mjs is unused historical paid adapter.
 
 ## Verified
-37 tests cover energy/reserve/summits, exports, coordinates, terrain increase/ascent, strict station filtering, road leg rechecks, charge jumps, missing-data rejection and Registry/OSM IDs not being sent as Google Place IDs. Browser tests verify real elevation and station responses, not just fixtures. See README for observed coverage limits.
+45 tests cover energy/reserve/summits, exports, coordinates, terrain increase/ascent, strict station filtering, road leg rechecks, charge jumps, missing-data rejection and Registry/OSM IDs not being sent as Google Place IDs. Browser tests verify real elevation and station responses, not just fixtures. See README for observed coverage limits.
 
 ## Constraints and next work
 Maintain the open eŞarjRadar feed attribution and date display. Do not label listed station maximum power as guaranteed connector power. Preserve access/road checks; drivers must confirm station status. Refresh bundled province bounds and dated ŞarjKaç price references with `python3 refresh-data.py`; this uses curl to fetch their openly published JSON endpoints. The tariff reference is not live and does not silently overwrite user tariffs. Check EPDK Şarj@TR/operator apps for actual socket prices and status. No direct EPDK API integration is claimed.
 
-Improve greedy search to bounded graph search/backtracking and compare target SOC/time/cost. Current100% stop target is conservative but slow. Terrain uses max100 points per leg, DEM90m, roughly2km spacing; adaptive crest sampling would be better. Simplified speed/temperature/wind/mass/charging curves need vehicle calibration. Unknown power has unknown duration.
+Improve greedy search to bounded graph search/backtracking and compare target SOC/time/cost. The target selector defaults to80%; 100% is available for longer legs. Terrain uses max100 points per leg, DEM90m, roughly2km spacing; adaptive crest sampling would be better. Simplified speed/temperature/wind/mass/charging curves need vehicle calibration. Unknown power has unknown duration.
 
 Do not promise never falling below20%. Enforce the floor at every sampled point; don't check only final arrival. Never silently drop failed elevation or replace failed live data with fixtures. Keep complete export disabled until the whole plan succeeds, and clear it on settings/address changes. Google may choose different roads; preserve this caveat.
 
@@ -40,3 +40,12 @@ Highway consumption is NOT WLTP consumption: the importer estimates a reference 
 
 ## City-centre endpoint fix
 The original trip accepted address pins up to 1 km from a road, while charging legs incorrectly used a 100 m limit for every endpoint. Photon’s Istanbul city point is about 132 m from the OSRM road network; all charger legs failed before any battery calculation. `fetchRoad` now supports separate start/end radiuses. The planner preserves 1 km for the original origin/destination and 100 m for charging-station endpoints, including departures from stations. Reserve thresholds and terrain checks are unchanged. Road-access failures are reported separately from below-reserve candidates, and bounded-search failure is not presented as proof a trip is impossible. Regression tests enforce the endpoint distinction.
+
+Charging target is a browser-saved trip preference (`chargeTarget`), independent of vehicle and starting battery. Changing it clears stale charging plans and exports; select Find charging stops again. Every leg still enforces the reserve plus buffer.
+
+## Driver experience review
+One main action now calculates the road route and then the complete charging plan. Both 80% (default) and 100% targets are supported; no silent upgrade. Main summary shows total driving + stop time, assumed-tariff cost, arrival/minimum battery, distance and stop count. Energy/ascent/payload details, station specifications, tariff comparison and privacy/source explanations remain in expandable sections. Google Maps export is next to the summary; more than three stops retains explicit mobile-part guidance. Vehicle access works on mobile.
+
+Fixed during review: hidden mobile vehicle control, invalid occupant/buffer/reserve input acceptance, incomplete terrain profiles silently passing, missing total charging cost/time, and time rounding displaying 1h60m. Input changes cancel old charging plans and disable export. Unknown charge duration remains unknown in total time. Automated coverage includes 80% needing more stops than100%, terrain rejection, summary totals, duration rounding and input validation.
+
+Remaining limits: bounded greedy routing can miss feasible/better routes; no live charger occupancy/queue or socket-level prices; no live traffic/weather, road closures, toll preferences or amenity dataset; vehicle consumption and taper are estimates. Next priorities are bounded backtracking with alternative stops, route-option comparison, and documented live operator integrations when freely available. Do not invent these data or advertise live availability. Google Maps navigation can recalculate roads; battery/charging amounts stay in EV Route.

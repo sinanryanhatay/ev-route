@@ -5,7 +5,7 @@ Free personal/non-commercial EV trip planner for Turkey. Public app: https://att
 ## Run
 `python3 -m http.server 4173 --directory dist`
 
-`node --test tests/*.test.mjs` — 37 tests. No build step, framework or API keys.
+`node --test tests/*.test.mjs` — 45 tests. No build step, framework or API keys.
 
 ## Current functionality
 - OpenFreeMap / MapLibre road map, Photon address autocomplete and browser current location.
@@ -13,7 +13,7 @@ Free personal/non-commercial EV trip planner for Turkey. Public app: https://att
 - Open-Meteo Copernicus DEM GLO-90 elevation sampled along road geometry; climbing energy depends on vehicle plus payload mass. Downhill recovery is conservative and net energy per segment cannot be negative.
 - Six trip metrics and battery profile. The chosen speed is a consumption scenario applied across the distance; OSRM time uses its own road speeds and excludes traffic.
 - Find charging stops queries eŞarjRadar’s open EPDK-derived regional station feed. It respects selected networks, documented compatible connectors and the fast-only setting.
-- Each accepted charging leg is individually road-routed (100 m charger road snap; original 1 km tolerance for city/address endpoints), elevation-sampled and battery-checked. The floor is max(20%, selected reserve) + buffer. Plans use 100% departure at stops and up to six stops; this is a bounded forward greedy search, NOT globally fastest/cheapest optimization.
+- Each accepted charging leg is individually road-routed (100 m charger road snap; original 1 km tolerance for city/address endpoints), elevation-sampled and battery-checked. The floor is max(20%, selected reserve) + buffer. Plans use the selected 80% or 100% departure at stops and up to six stops; this is a bounded forward greedy search, NOT globally fastest/cheapest optimization.
 - Stop names/coordinates/source links, expected arrival/departure, assumed-tariff cost and charging time where station maximum power is listed. Exclude/replan and ordered Google Maps export with mobile-safe split links.
 - Edited inputs invalidate the charging plan and disable its export. API failures or insufficient data never substitute sample stations.
 
@@ -24,7 +24,7 @@ The ŞarjKaç price comparison panel is a bundled dated reference (https://www.s
 
 This is an estimate, not a guarantee of staying above 20%. DEM terrain samples are about 2 km apart, coarser on long legs (100 samples maximum per leg); small hills, bridges/tunnels and road gradients can be missed. Vehicle model and charging curve are illustrative, not calibrated MY25 telemetry. Public API availability is best-effort. No traffic/weather/road-speed telemetry.
 
-Charging targets currently use 100% for conservatism and can be slow. Unknown station power produces unknown charging time, not a made-up duration. Costs use your input tariffs and 92% assumed charging efficiency.
+Choose 80% (default) or 100% for charging stops. The selected target controls subsequent reach, charge energy, time and assumed cost; it never changes starting battery. No silent upgrade to 100% occurs. Unknown station power produces unknown charging time, not a made-up duration. Costs use your input tariffs and 92% assumed charging efficiency.
 
 ## Services and privacy
 - Map: OpenFreeMap, MapLibre 5.12.0 from unpkg; OSM attribution retained.
@@ -53,3 +53,12 @@ Highway consumption is NOT WLTP consumption: the importer estimates a reference 
 
 ## City-centre endpoint fix
 The original trip accepted address pins up to 1 km from a road, while charging legs incorrectly used a 100 m limit for every endpoint. Photon’s Istanbul city point is about 132 m from the OSRM road network; all charger legs failed before any battery calculation. `fetchRoad` now supports separate start/end radiuses. The planner preserves 1 km for the original origin/destination and 100 m for charging-station endpoints, including departures from stations. Reserve thresholds and terrain checks are unchanged. Road-access failures are reported separately from below-reserve candidates, and bounded-search failure is not presented as proof a trip is impossible. Regression tests enforce the endpoint distinction.
+
+Charging target is a browser-saved trip preference (`chargeTarget`), independent of vehicle and starting battery. Changing it clears stale charging plans and exports; select Find charging stops again. Every leg still enforces the reserve plus buffer.
+
+## Driver experience review
+One main action now calculates the road route and then the complete charging plan. Both 80% (default) and 100% targets are supported; no silent upgrade. Main summary shows total driving + stop time, assumed-tariff cost, arrival/minimum battery, distance and stop count. Energy/ascent/payload details, station specifications, tariff comparison and privacy/source explanations remain in expandable sections. Google Maps export is next to the summary; more than three stops retains explicit mobile-part guidance. Vehicle access works on mobile.
+
+Fixed during review: hidden mobile vehicle control, invalid occupant/buffer/reserve input acceptance, incomplete terrain profiles silently passing, missing total charging cost/time, and time rounding displaying 1h60m. Input changes cancel old charging plans and disable export. Unknown charge duration remains unknown in total time. Automated coverage includes 80% needing more stops than100%, terrain rejection, summary totals, duration rounding and input validation.
+
+Remaining limits: bounded greedy routing can miss feasible/better routes; no live charger occupancy/queue or socket-level prices; no live traffic/weather, road closures, toll preferences or amenity dataset; vehicle consumption and taper are estimates. Next priorities are bounded backtracking with alternative stops, route-option comparison, and documented live operator integrations when freely available. Do not invent these data or advertise live availability. Google Maps navigation can recalculate roads; battery/charging amounts stay in EV Route.
