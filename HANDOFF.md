@@ -1,67 +1,25 @@
-# EV Route: handoff for Claude Code or Codex
+# EV Route — continuation handoff
 
-**Current status:** Live OSRM road routing and trip metrics are implemented. Use Calculate my trip after choosing both endpoints. The map draws the road route; six cards show distance, driving time, energy, arrival without charging, distance to reserve and extra charging needed. Battery estimates exclude terrain. Automatic verified charging-stop planning is still unfinished. 21 tests pass. See the Live road metrics update below for details; earlier sample-engine notes describe retained development code.
+Read README.md and AGENTS.md. Keep the app free; do not enable billing, paid APIs or paid fallbacks. Repository remains with sinanryanhatay; brother can fork and use Claude Code or Codex. GitHub commits do not automatically deploy the original Sites app.
 
-## User objective and constraints
-Build a publicly accessible, mobile-friendly EV trip planner for Turkey. Vehicle: 2025 BYD Atto 3, nominal 60.48 kWh. Networks: ZES, Lumicle, Astor, WAT and Trugo. Inputs: start/destination, current battery, minimum 20% reserve plus buffer, 130/140 km/h cruising preference, occupants and luggage or total payload. Compare fastest, cheapest and balanced charging stops. Export ALL selected stops in order to Google Maps.
+## Files
+- app.mjs: UI orchestration, route/terrain metrics, stale-request cancellation, stop plan display/export.
+- trip.mjs: OSRM road request and baseline metric validation.
+- terrain.mjs: road-distance resampling, Open-Meteo elevation, payload-dependent terrain energy and SOC trace.
+- chargers.mjs: regional eŞarjRadar/EPDK requests, dated registry metadata, strict network/connector/power filtering.
+- planner.mjs: bounded forward greedy stop selection (90% level-road candidate reach, 8 km spacing to avoid a cluster crowding out earlier stops); actual routed/elevation-checked legs; floor max(20,reserve)+buffer; charge to100%; max6 stops/24 route checks. No claim of global optimum or exhaustive feasibility.
+- free-map.mjs/search.mjs: OpenFreeMap pins/road line, Photon autocomplete.
+- export.mjs: complete ordered Google URL export, mobile waypoint limits.
+- engine.mjs: existing consumption/charge model and historical sample optimizer. google.mjs is unused historical paid adapter.
 
-IMPORTANT: The owner does NOT want to be charged. Do not provision paid services, enable billing, add paid Google API calls or require a paid API key without new explicit authorization. Google Maps URL handoff needs no API key and is the intended free navigation path. The historical Google adapter is no longer imported by the app and has NOT been connected or end-to-end tested. It uses potentially billed APIs and must remain opt-in/disconnected. A dynamic Google route inside the app is not supplied by the free URL handoff. Do not recreate a fictional map or claim that sample routes are live.
+## Verified
+27 tests cover energy/reserve/summits, exports, coordinates, terrain increase/ascent, strict station filtering, road leg rechecks, charge jumps, missing-data rejection and Registry/OSM IDs not being sent as Google Place IDs. Browser tests verify real elevation and station responses, not just fixtures. See README for observed coverage limits.
 
-## Current update: OpenFreeMap is implemented
+## Constraints and next work
+Maintain the open eŞarjRadar feed attribution and date display. Do not label listed station maximum power as guaranteed connector power. Preserve access/road checks; drivers must confirm station status. Refresh bundled province bounds and dated ŞarjKaç price references with `python3 refresh-data.py`; this uses curl to fetch their openly published JSON endpoints. The tariff reference is not live and does not silently overwrite user tariffs. Check EPDK Şarj@TR/operator apps for actual socket prices and status. No direct EPDK API integration is claimed.
 
-The active app now uses MapLibre GL JS 5.12.0 (pinned unpkg CDN) and OpenFreeMap Liberty tiles. No Google SDK, paid API or API-key prompt is loaded. `dist/free-map.mjs` handles map loading, attribution, coordinate validation, A/B pins and map-point selection. Current-location is beside From with permission/error feedback. Google Maps remains external URL navigation. There are 17 tests, including coordinate bounds.
+Improve greedy search to bounded graph search/backtracking and compare target SOC/time/cost. Current100% stop target is conservative but slow. Terrain uses max100 points per leg, DEM90m, roughly2km spacing; adaptive crest sampling would be better. Simplified speed/temperature/wind/mass/charging curves need vehicle calibration. Unknown power has unknown duration.
 
-The actual map is NOT a live EV-routing engine. No free geocoding/road routing/elevation/station backend is connected. Typed addresses are handed off to Google Maps; map-picked coordinates produce pins. Sample stations lack verified coordinates, so they are not plotted, and no fake road line is drawn. The map remains usable even when no sample charging plan is feasible.
+Do not promise never falling below20%. Enforce the floor at every sampled point; don't check only final arrival. Never silently drop failed elevation or replace failed live data with fixtures. Keep complete export disabled until the whole plan succeeds, and clear it on settings/address changes. Google may choose different roads; preserve this caveat.
 
-## Current implementation
-Vanilla HTML/CSS/ES modules in dist/. No framework, build step or npm dependencies. Static hosting works. README documents the model assumptions. Tests run on Node's standard test runner.
-
-- dist/index.html: forms, results, Google setup and route-export dialogs.
-- dist/app.mjs: UI, saved preferences, rendering, planning orchestration.
-- dist/engine.mjs: simplified energy/charging model and dynamic-programming planner.
-- dist/export.mjs: Google Maps URL generation, ordered stops and mobile-safe splitting.
-- dist/google.mjs: optional Google Maps JS, Routes, Places and Elevation adapter; unverified with credentials.
-- tests/: 17 model/export/map-coordinate tests.
-
-Run: python3 -m http.server 4173 --directory dist
-Test: node --test tests/*.test.mjs
-
-The existing public demo is https://atto-route-sinan.srh34.chatgpt.site . This repository is portable; the original owner's Sites identity and source-repository credentials are intentionally excluded. GitHub edits do NOT automatically deploy to that Sites instance. You can deploy dist/ on a free static host or configure GitHub Pages separately, subject to current account eligibility. Do not assume deployment or billing has been configured.
-
-## What actually works
-Sample trip calculation, passenger/luggage/override effects, reserve constraints, network filtering, changing priorities, excluding stops, battery chart, persisted browser preferences, all-stop Google Maps export, and mobile-safe split links. Input changes disable export until recalculation.
-
-## What does NOT yet work as a verified live service
-- No free live route/elevation/station backend is connected.
-- The sample's distance, terrain, power and tariffs are illustrative. Names come from directory research but exact entrances and motorway direction are not verified.
-- No live operator prices, occupancy or queue predictions; tariffs are user assumptions.
-- No actual vehicle telemetry, battery degradation input, road-segment speed or automatic weather model.
-- No automatic backup selection if Google route verification fails.
-- Google model is conservative and simplified; do not promise never falling below 20%.
-- The schematic map was removed at the owner's request. The map now displays actual OpenFreeMap geography; unverified sample charger points and road paths are not drawn.
-
-## Suggested next work, respecting zero-charge constraint
-1. Agree on a genuinely free map/routing/data strategy. Consider open-source mapping with correct attribution and tile-provider usage limits. Public demo endpoints are not unlimited production infrastructure. Do not bypass Google API requirements using undocumented endpoints or scraping.
-2. Integrate real road geometry, road-access checks for stations, elevation sampling, and reliable licensed Turkish station data. Clearly distinguish missing data from available chargers.
-3. Calibrate empty vehicle mass, usable battery capacity, consumption at speed, weather effects and charging curve against verified MY25 data / user measurements.
-4. Ensure the same route and stop sequence drives the display, optimizer, battery profile and Google export. Google may choose different roads after handoff.
-5. Test at mobile sizes and test export on Android/iOS. Google URL limits are up to 3 intermediate waypoints on mobile browsers and up to 9 elsewhere, with a 2,048-character URL cap. Split links preserve every stop.
-6. Retain transparent sample labeling, no-feasible-plan errors and stale-plan export protection.
-
-## Ready-to-paste prompt
-Read README.md, HANDOFF.md and AGENTS.md, inspect the code, and run the tests. Continue EV Route from this implementation. The owner requires a zero-charge approach: do not enable billed Google APIs or provision paid resources. First identify a feasible free map and routing approach and explain its data/usage limits. Replace illustrative route data only when real data is available; preserve all-stop Google Maps export, battery reserve checks, passenger/luggage inputs, and clear uncertainty. Do not claim the current sample is a verified driving itinerary. Keep the original owner's deployment untouched unless explicitly authorized.
-
-## Sharing with the brother
-The repository remains in the owner's account. The brother can fork it to his GitHub account, clone his fork, and open the folder in Claude Code or Codex. Chat subscriptions and chat histories are not transferred with a repository. The source and these handoff notes provide the context. No ownership transfer is required.
-
-
-Latest UI update: removed the Urla demo loader and sample status bar. From/To start empty. The primary action opens Google Maps directions. Unconnected charging-result controls are hidden; the engine and tests remain for continued development. Arbitrary-route EV planning is not implemented.
-
-
-Address autocomplete update: both From and To now use Photon’s public API (550ms debounce, minimum 3 characters, bounded memory cache, abort and stale-response protection). Results have keyboard/touch selection; selected coordinates drive map pins and Google Maps navigation. No key or billing. Photon is a best-effort public demo with reasonable-use limits; OSM POI coverage differs from Google. No paid fallback. Typing search text sends it to Photon. Road/charging planning remains unconnected.
-
-
-## Live road metrics update
-`trip.mjs` now requests an OSRM driving route on explicit Calculate my trip. Both endpoints must be coordinate inputs or selected autocomplete results. The real road line, distance and OSRM time feed a six-card metrics section and a battery-without-charging chart. Vehicle-setting edits recompute locally; endpoint edits clear old results and abort pending requests. Requests time out at 20 seconds, route snapping is limited to 1 km, and failures never use sample routes. Map style reload restores the route line. Google Maps can choose a different route.
-Energy uses the existing level-road consumption model at the chosen speed over the whole distance. It is a speed scenario, not road-segment speed prediction. OSRM time excludes traffic and charging and uses its own speed model. Arrival below zero is shown as Not reachable; charging-needed is battery energy required to finish at reserve + buffer, not grid energy or a verified stop itinerary. Terrain, charging stations, tariffs and charging time remain unconnected. Public OSRM service is best-effort, no key/billing; coordinates are sent only on calculation. No paid fallback.
-21 tests pass, including real-route metric unit conversions, reserve energy balance, unreachable trips and settings validation.
+Free-service endpoints/attributions/privacy are in README. Review public API usage policy before scale/commercial use. No credentials or original Sites project identity belong in this portable GitHub repository.
