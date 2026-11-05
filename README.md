@@ -5,7 +5,7 @@ Free personal/non-commercial EV trip planner for Turkey. Public app: https://att
 ## Run
 `python3 -m http.server 4173 --directory dist`
 
-`node --test tests/*.test.mjs` — 34 tests. No build step, framework or API keys.
+`node --test tests/*.test.mjs` — 37 tests. No build step, framework or API keys.
 
 ## Current functionality
 - OpenFreeMap / MapLibre road map, Photon address autocomplete and browser current location.
@@ -13,7 +13,7 @@ Free personal/non-commercial EV trip planner for Turkey. Public app: https://att
 - Open-Meteo Copernicus DEM GLO-90 elevation sampled along road geometry; climbing energy depends on vehicle plus payload mass. Downhill recovery is conservative and net energy per segment cannot be negative.
 - Six trip metrics and battery profile. The chosen speed is a consumption scenario applied across the distance; OSRM time uses its own road speeds and excludes traffic.
 - Find charging stops queries eŞarjRadar’s open EPDK-derived regional station feed. It respects selected networks, documented compatible connectors and the fast-only setting.
-- Each accepted charging leg is individually road-routed (maximum 100 m road snap), elevation-sampled and battery-checked. The floor is max(20%, selected reserve) + buffer. Plans use 100% departure at stops and up to six stops; this is a bounded forward greedy search, NOT globally fastest/cheapest optimization.
+- Each accepted charging leg is individually road-routed (100 m charger road snap; original 1 km tolerance for city/address endpoints), elevation-sampled and battery-checked. The floor is max(20%, selected reserve) + buffer. Plans use 100% departure at stops and up to six stops; this is a bounded forward greedy search, NOT globally fastest/cheapest optimization.
 - Stop names/coordinates/source links, expected arrival/departure, assumed-tariff cost and charging time where station maximum power is listed. Exclude/replan and ordered Google Maps export with mobile-safe split links.
 - Edited inputs invalidate the charging plan and disable its export. API failures or insufficient data never substitute sample stations.
 
@@ -50,3 +50,6 @@ Choose brand → model → exact model year → version/battery in My vehicle. S
 OpenEV data is redistributed with `dist/vehicle-data-license.txt` (CDLA-Permissive-2.0). Source release: https://github.com/open-ev-data/open-ev-data-dataset/releases/tag/v1.24.0 . Refresh deliberately: download that release JSON and run `python3 import-vehicles.py /path/to/open-ev-data-v1.24.0.json`; review source/schema/license before upgrading. Do not execute downloaded code. Tests validate every resulting record and exact-year filtering.
 
 Highway consumption is NOT WLTP consumption: the importer estimates a reference at130 km/h from drag area (Cd × width × height ×0.84 where known, otherwise0.70 m²), air density1.225, rolling resistance0.01, drivetrain efficiency0.90, auxiliary0.7kW, and75kg driver. This generic estimate is visibly labelled and user-editable. Preserve the existing speed adjustment model. BYD TR uses the earlier23kWh/100km highway assumption; its official16.0 WLTP combined is only context. Brochure lists60.48kWh without separating usable capacity, so that is explicitly a planning assumption; DC110kW, AC11kW, mass1750kg are from the1July2025 brochure. Existing manual Atto profiles are not silently overwritten.
+
+## City-centre endpoint fix
+The original trip accepted address pins up to 1 km from a road, while charging legs incorrectly used a 100 m limit for every endpoint. Photon’s Istanbul city point is about 132 m from the OSRM road network; all charger legs failed before any battery calculation. `fetchRoad` now supports separate start/end radiuses. The planner preserves 1 km for the original origin/destination and 100 m for charging-station endpoints, including departures from stations. Reserve thresholds and terrain checks are unchanged. Road-access failures are reported separately from below-reserve candidates, and bounded-search failure is not presented as proof a trip is impossible. Regression tests enforce the endpoint distinction.
