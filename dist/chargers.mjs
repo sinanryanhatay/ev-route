@@ -20,4 +20,11 @@ export async function fetchStations(road,{signal}={}){
  const value=[...new Map(rows.map(r=>[r.osmId,r])).values()].map(st=>{let best=Infinity,progress=0;for(const p of samples){const d=distance(p,st.location);if(d<best){best=d;progress=p.km;}}return {...st,progress,offset:best};}).filter(st=>st.offset<9);
  cached={key,time:Date.now(),value};return value;
 }
-export function eligibleStations(stations,s){return stations.filter(p=>p.network&&s.networks.includes(p.network)&&(s.fastOnly?p.ccs&&p.power>=50:p.ccs||p.ac));}
+export function eligibleStations(stations,s){return stations.flatMap(p=>{
+ if(!p.network||!s.networks.includes(p.network))return [];
+ const dc=p.ccs&&(s.dcConnector??'CCS2')==='CCS2'&&(s.maxDcPower??95)>0;
+ const ac=p.ac&&(s.acConnector??'Type2')==='Type2'&&(s.maxAcPower??11)>0;
+ if(s.fastOnly&&(!dc||p.power<50)||!dc&&!ac)return [];
+ // Mixed sites expose only a site maximum: do not use DC power for an AC session.
+ return [{...p,chargeKind:dc?'dc':'ac',connector:dc?'CCS2':'Type 2',power:!dc&&p.ccs?0:p.power}];
+ });}

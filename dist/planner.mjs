@@ -28,7 +28,7 @@ export async function planCharging(origin,destination,direct,s,{signal,onStatus=
   for(const candidate of spread){onStatus(`Checking access and terrain to ${candidate.name}…`);let leg;try{leg=await getLeg(here,candidate.location);}catch(e){if(e.message.startsWith('No driving route'))continue;throw e;}const ev=terrainEnergy(leg,s,soc);if(meetsReserve(ev,floor)){selected={candidate,leg,ev};break;}}
   if(!selected)throw Error(`No reserve-safe next stop found (${pool.length} eligible stations; ${spread.length} candidate checks; estimated level-road reach ${Math.round(range)} km) after ${stops.length} selected stop(s)${stops.length?' (last: '+stops.at(-1).name+')':''}. Free coverage may be incomplete. Increase starting charge, reduce speed or allow more networks. No complete itinerary is available.`);
   const {candidate,leg,ev}=selected;append(leg,ev);const target=100,kwh=(target-soc)/100*s.capacity;
-  const stop={...candidate,km,arrival:soc,target,kwh,minutes:candidate.power?chargeMinutes(soc,target,candidate.power,s)+5:null,cost:kwh/.92*s.tariffs[candidate.network]};stops.push(stop);soc=target;trace.push({km,soc});here=candidate.location;progress=candidate.progress;
+  const stop={...candidate,km,arrival:soc,target,kwh,minutes:candidate.power?chargeMinutes(soc,target,candidate.power,s,candidate.chargeKind)+5:null,cost:kwh/.92*s.tariffs[candidate.network]};stops.push(stop);soc=target;trace.push({km,soc});here=candidate.location;progress=candidate.progress;
  }
  throw Error('Trip needs more than six stops; shorten the trip into sections. No complete plan was exported.');
 }
