@@ -17,3 +17,20 @@ test('EPDK-derived registry preserves dated specifications without treating pric
  const rows=parseRegistry({guncellendi:'2026-11-05',sayfa:'https://esarjradar.com/bursa-sarj-istasyonlari/',istasyonlar:[{epdkNo:'ŞRJ/1',ad:'Test ZES',operator:'zes',enlem:40,boylam:29,gucKw:400,soketler:['CCS2'],soketSayisi:4,fiyat:{dc:1}}]});
  assert.equal(rows[0].power,400);assert.equal(rows[0].updated,'2026-11-05');assert.equal(rows[0].socketCount,4);assert.equal(rows[0].cost,undefined);assert.equal(eligibleStations(rows,{networks:['ZES'],fastOnly:true}).length,1);
 });
+
+test('city address endpoints keep original route tolerance while charger endpoints remain strict',async()=>{
+ const a={lat:41.006381,lng:28.9758715},b={lat:36.8522547,lng:28.2742661},c={lat:40.8,lng:29};const requests=[];
+ const services={fetchStations:async()=>[{osmId:'city-regression',name:'Reachable charger',network:'ZES',location:c,ccs:true,power:100,progress:100}],terrainRoad:async r=>r,fetchRoad:async(from,to,options)=>{requests.push(options);if(from===a&&options.startSnap<132.3)throw Error('No driving route found near these points.');return road(100);}};
+ // Destination is intentionally distant; fixture leg distances need a near destination to reach the final check.
+ const dest={lat:40.7,lng:29.1};const p=await planCharging(a,dest,road(300),DEFAULTS,{services});assert.equal(p.stops.length,1);assert.equal(requests[0].startSnap,1000);assert.equal(requests[0].endSnap,100);assert.equal(requests[1].startSnap,100);assert.equal(requests[1].endSnap,1000);assert.ok(p.minimum>=25);
+});
+test('road access failures are distinguished from a battery reserve failure',async()=>{
+ const services={fetchStations:async()=>[{osmId:'bad-road',name:'Bad road',network:'ZES',location:{lat:40,lng:29.1},ccs:true,power:100,progress:100}],terrainRoad:async r=>r,fetchRoad:async()=>{throw Error('No driving route found near these points.');}};
+ await assert.rejects(planCharging({lat:40,lng:29},{lat:39,lng:28},road(300),DEFAULTS,{services}),/road-access failures/);
+});
+
+test('OSRM request carries independent address and charger search radiuses',async()=>{
+ const {fetchRoad}=await import('../dist/trip.mjs');const original=globalThis.fetch;const urls=[];
+ globalThis.fetch=async url=>{urls.push(new URL(url));return {ok:true,json:async()=>({code:'Ok',routes:[road(1)]})};};
+ try{await fetchRoad({lat:41,lng:29},{lat:40,lng:29},{maxSnap:100,startSnap:1000});await fetchRoad({lat:40,lng:29},{lat:37,lng:28},{maxSnap:100,endSnap:1000});assert.equal(urls[0].searchParams.get('radiuses'),'1000;100');assert.equal(urls[1].searchParams.get('radiuses'),'100;1000');}finally{globalThis.fetch=original;}
+});
