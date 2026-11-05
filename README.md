@@ -1,45 +1,51 @@
 # EV Route
 
-A dependency-free, mobile-friendly first version of a personal BYD Atto 3 route planner.
+A static EV trip-planning prototype for Turkey, with a real **OpenFreeMap** map and **Google Maps URL navigation**. No API key, billing account or paid Google service is required by the active app.
 
-Start with [HANDOFF.md](HANDOFF.md) for the owner’s zero-charge requirement, known limitations, and a ready-to-paste prompt for Claude Code or Codex. Sending stops to Google Maps via URL is free and requires no API key.
+Public app: https://atto-route-sinan.srh34.chatgpt.site
+Source: https://github.com/sinanryanhatay/ev-route
+Read [HANDOFF.md](HANDOFF.md) before continuing development in Claude Code or Codex.
 
-Run locally: `python3 -m http.server 4173 --directory dist`
+## Run and test
 
-Run tests: `node --test tests/*.test.mjs`
+Serve locally: `python3 -m http.server 4173 --directory dist`
 
-## Included
+Tests (Node 20+): `node --test tests/*.test.mjs` — 17 tests.
 
-- Sample Zekeriyaköy–Urla journey, prominently labelled as illustrative.
-- Starting charge, reserve plus buffer, highway cruising speed.
-- 1–5 occupants, average occupant weight, luggage, total payload override.
-- Network filters, DC-only mode, fastest / cheapest / balanced optimization.
-- User-entered tariffs, temperature, wind and baseline consumption.
-- Stop exclusion, recalculation, battery chart, Google Maps stop handoff.
-- Optional Google Maps JS integration: real route geometry, sampled elevation, charger discovery, rerouting through selected stops and reserve revalidation.
-- Preferences in localStorage. Google key only in the active page, not persisted.
+No build step or package installation is needed. An internet connection and WebGL support are needed for the map. MapLibre GL JS/CSS 5.12.0 loads from unpkg; map style/tiles/glyphs load from OpenFreeMap. Required provider attribution remains visible.
 
-## Optional Google adapter — not enabled
+## Implemented
 
-The owner requires a zero-charge solution. Do not enable billing or this potentially billed adapter without new explicit authorization. It is retained as unverified optional code only. The adapter would require Maps JavaScript API, Routes API, Places API (New), and Elevation API in a Google Cloud project. Use an HTTP-referrer-restricted browser key limited to the deployed site's origin and those APIs. Enter it in Connect Google Maps. Never use an unrestricted server key here. Route planning issues multiple billed requests. Set project quotas.
+- Real, pannable/zoomable OpenStreetMap geography using OpenFreeMap and MapLibre.
+- Current-location button beside From; runs only when clicked and requires browser permission. No automatic location request.
+- Set start / Set destination on the map; latitude/longitude inputs produce A/B pins. Free Google Maps navigation works with those coordinates or typed addresses.
+- Complete Google Maps export of selected sample charging stops, in order; mobile-safe splitting preserves all stops.
+- Sample Zekeriyaköy–Urla charging optimizer with reserve/buffer, speed, passenger and luggage weight, total payload override, network filters and charging priorities.
+- Saved preferences, editable consumption/weather/tariff assumptions, stop exclusion and battery chart.
 
-Live integration is implemented against the current Google documentation but has NOT been end-to-end verified with a paid API key. API access, billing, domain restrictions and regional charger data may affect it. Failed discovery/elevation/access validation shows an error; it never silently substitutes sample data.
+## Important scope
 
-## Model and limits
+**The map is real; the EV itinerary is still a sample.** OpenFreeMap provides display tiles, not road routing, geocoding, elevation or reliable charger data. Typed place names are not automatically geocoded. Use map selection/current location to position exact pins. Sample chargers are not plotted because their coordinates have not been verified. No invented road polyline is drawn. A new origin/destination can open in Google Maps, but does not get a fabricated EV charging plan.
 
-60.48 kWh nominal battery; 1,750 kg assumed empty vehicle mass (not a certified specification). Baseline 23 kWh/100 km at 130 km/h, 20°C, level road and 75 kg driver is an assumption. Baseline split: 65% aerodynamic, 30% rolling, 5% auxiliary. Payload modifies rolling and gravitational energy. Climbing efficiency 88%; descending recovery 60%, conservatively capped at zero net segment consumption. Cold-load adjustment is approximate. No automatic weather, battery health, road-specific driving-speed model or vehicle telemetry.
+The active app does not import `google.mjs`, load Google's SDK, or expose a paid API-key setup. `google.mjs` is retained as historical, unverified adapter source only; do not reconnect it without explicit owner authorization. No free routing or station-data backend is connected yet.
 
-Charging uses an illustrative tapered acceptance curve (95/65/43/25 kW at <60/<80/<90/90+% SOC), station-power cap, 11 kW AC cap, 92% charging efficiency and 5 minutes per stop. It is not a measured MY25 charging curve.
+Google Maps may recalculate roads after handoff. It receives destinations, not charging targets. URLs support up to nine intermediate stops on supported clients and three on mobile browsers, with a 2,048-character URL limit. The split fallback preserves continuity. Changed settings disable charging-plan export until recalculation.
 
-Optimization is a forward station graph with 5-percentage-point departure-charge steps. Fastest minimizes modeled stop time; cheapest minimizes user-estimated charging expense; balanced values a minute at ₺12. Driving time is fixed per route (sample time scales with cruising speed; Google's time does not). No toll optimization, queues, reservations, automatic tariffs or live availability.
+## Model assumptions
 
-Sample station names are drawn from earlier public directory research; all kilometer positions, elevation profile, power ratings and tariffs in the fixture are illustrative, not verified road data. Astor has no sample candidate and selecting only Astor yields an explicit infeasible result. AC filtering is supported for live discovery but the sample contains only DC stations.
+Nominal battery 60.48 kWh; assumed empty vehicle mass 1,750 kg, not a certified specification. Baseline 23 kWh/100 km at 130 km/h on level roads at 20°C with a 75 kg driver is illustrative. Baseline split is 65% aerodynamic / 30% rolling / 5% auxiliary; payload affects rolling and climbing. Climbing efficiency 88%, descending recovery 60%, conservatively capped at zero net segment consumption. Cold-load effects are approximate. No road-specific speed, battery degradation, telemetry or automatic weather model.
 
-Live search samples up to 25 areas within 25 km radii and requires identifiable operator names and compatible connector metadata. This may miss chargers. Provisional off-route distances are straight-line estimates; selected stops are then routed by road and elevation is sampled per leg before acceptance. If verification fails, there is no automatic exhaustive alternative search. Google elevation is sampled and cannot certify the reserve between samples. A modeled feasible route is not a real-world guarantee.
+Charging uses an illustrative tapered curve (95/65/43/25 kW below 60/80/90/above 90% SOC), station-power limits, 11 kW AC cap, 92% efficiency and five-minute stop overhead. Not a measured MY25 curve. Optimization uses 5%-point departure-charge increments. Fastest minimizes stop time; cheapest minimizes user-entered tariff cost; balanced values a minute at ₺12. Sample driving time scales with speed; tolls and queues are excluded.
+
+Sample station names were researched in public directories, but fixture distances, elevation, power and prices are illustrative. No guarantee of remaining above 20% in real driving is possible from this model.
+
+## Free-service limits and privacy
+
+OpenFreeMap's public instance currently requires no registration or key and is free. Availability is best-effort without an SLA. Do not add paid services or silently fall back to billed providers. Map/CDN providers receive ordinary network requests. Google receives addresses/stops only when the visitor opens a navigation link. Location and preferences remain in the visitor's browser; no account or application backend is present.
 
 ## Verification
 
-15 Node tests cover reserve constraints, summit energy, payload override, weight/speed/wind effects, no-stop journeys, network exclusions, charging caps, invalid inputs and objective optimization. Browser checks covered initial rendering, passenger/luggage recalculation, changed destination rejection and the Google connection dialog. Live API calls require a user-provided key and remain unverified.
+17 tests cover energy/reserve/payload, summit constraints, charging caps, network exclusions, ordered export, mobile waypoint limits and coordinate validation. Browser QA confirmed real map tiles, attribution, A-pin selection and stale-export protection. Real GPS permission and every mobile Google client have not been tested. New-route EV planning remains unfinished.
 
-## Google Maps export
-The selected itinerary exports origin, destination and every selected charger in order. Place IDs are included when available. One link supports at most nine intermediate stops and 2,048 characters. Mobile-safe chunks use at most three intermediate waypoints, preserving continuity and never dropping stops. Changed inputs disable export until recalculation. Sample exports are explicitly unverified. The schematic map has been removed; without a Google key the map area presents setup instructions instead of invented geometry.
+
+Latest UI update: removed the Urla demo loader and sample status bar. From/To start empty. The primary action opens Google Maps directions. Unconnected charging-result controls are hidden; the engine and tests remain for continued development. Arbitrary-route EV planning is not implemented.

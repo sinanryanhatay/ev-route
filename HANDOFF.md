@@ -3,7 +3,13 @@
 ## User objective and constraints
 Build a publicly accessible, mobile-friendly EV trip planner for Turkey. Vehicle: 2025 BYD Atto 3, nominal 60.48 kWh. Networks: ZES, Lumicle, Astor, WAT and Trugo. Inputs: start/destination, current battery, minimum 20% reserve plus buffer, 130/140 km/h cruising preference, occupants and luggage or total payload. Compare fastest, cheapest and balanced charging stops. Export ALL selected stops in order to Google Maps.
 
-IMPORTANT: The owner does NOT want to be charged. Do not provision paid services, enable billing, add paid Google API calls or require a paid API key without new explicit authorization. Google Maps URL handoff needs no API key and is the intended free navigation path. The optional existing Google adapter has NOT been connected or end-to-end tested. It uses potentially billed APIs and must remain opt-in/disconnected. A dynamic Google route inside the app is not supplied by the free URL handoff. Do not recreate a fictional map or claim that sample routes are live.
+IMPORTANT: The owner does NOT want to be charged. Do not provision paid services, enable billing, add paid Google API calls or require a paid API key without new explicit authorization. Google Maps URL handoff needs no API key and is the intended free navigation path. The historical Google adapter is no longer imported by the app and has NOT been connected or end-to-end tested. It uses potentially billed APIs and must remain opt-in/disconnected. A dynamic Google route inside the app is not supplied by the free URL handoff. Do not recreate a fictional map or claim that sample routes are live.
+
+## Current update: OpenFreeMap is implemented
+
+The active app now uses MapLibre GL JS 5.12.0 (pinned unpkg CDN) and OpenFreeMap Liberty tiles. No Google SDK, paid API or API-key prompt is loaded. `dist/free-map.mjs` handles map loading, attribution, coordinate validation, A/B pins and map-point selection. Current-location is beside From with permission/error feedback. Google Maps remains external URL navigation. There are 17 tests, including coordinate bounds.
+
+The actual map is NOT a live EV-routing engine. No free geocoding/road routing/elevation/station backend is connected. Typed addresses are handed off to Google Maps; map-picked coordinates produce pins. Sample stations lack verified coordinates, so they are not plotted, and no fake road line is drawn. The map remains usable even when no sample charging plan is feasible.
 
 ## Current implementation
 Vanilla HTML/CSS/ES modules in dist/. No framework, build step or npm dependencies. Static hosting works. README documents the model assumptions. Tests run on Node's standard test runner.
@@ -13,7 +19,7 @@ Vanilla HTML/CSS/ES modules in dist/. No framework, build step or npm dependenci
 - dist/engine.mjs: simplified energy/charging model and dynamic-programming planner.
 - dist/export.mjs: Google Maps URL generation, ordered stops and mobile-safe splitting.
 - dist/google.mjs: optional Google Maps JS, Routes, Places and Elevation adapter; unverified with credentials.
-- tests/: 15 model/export tests.
+- tests/: 17 model/export/map-coordinate tests.
 
 Run: python3 -m http.server 4173 --directory dist
 Test: node --test tests/*.test.mjs
@@ -30,7 +36,7 @@ Sample trip calculation, passenger/luggage/override effects, reserve constraints
 - No actual vehicle telemetry, battery degradation input, road-segment speed or automatic weather model.
 - No automatic backup selection if Google route verification fails.
 - Google model is conservative and simplified; do not promise never falling below 20%.
-- The schematic map was removed at the owner's request. Current map area asks for a connection rather than drawing false geography.
+- The schematic map was removed at the owner's request. The map now displays actual OpenFreeMap geography; unverified sample charger points and road paths are not drawn.
 
 ## Suggested next work, respecting zero-charge constraint
 1. Agree on a genuinely free map/routing/data strategy. Consider open-source mapping with correct attribution and tile-provider usage limits. Public demo endpoints are not unlimited production infrastructure. Do not bypass Google API requirements using undocumented endpoints or scraping.
@@ -45,3 +51,6 @@ Read README.md, HANDOFF.md and AGENTS.md, inspect the code, and run the tests. C
 
 ## Sharing with the brother
 The repository remains in the owner's account. The brother can fork it to his GitHub account, clone his fork, and open the folder in Claude Code or Codex. Chat subscriptions and chat histories are not transferred with a repository. The source and these handoff notes provide the context. No ownership transfer is required.
+
+
+Latest UI update: removed the Urla demo loader and sample status bar. From/To start empty. The primary action opens Google Maps directions. Unconnected charging-result controls are hidden; the engine and tests remain for continued development. Arbitrary-route EV planning is not implemented.
