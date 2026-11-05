@@ -12,7 +12,8 @@ export async function planCharging(origin,destination,direct,s,{signal,onStatus=
  let here=origin,soc=s.battery,progress=0,km=0,minutes=0,energyTotal=0,ascent=0,descent=0,checks=0;
  const stops=[],trace=[{km:0,soc}],geometry=[];let pool;
  const roadCache=new Map();
- async function getLeg(a,b){const key=[a.lat,a.lng,b.lat,b.lng].join(',');if(roadCache.has(key))return roadCache.get(key);if(++checks>24)throw Error('The bounded search could not complete a reserve-safe plan. Try more networks or a higher starting charge.');const road=await loadTerrain(await loadRoad(a,b,{signal,maxSnap:100}),{signal});roadCache.set(key,road);return road;}
+ async function getLeg(a,b){const key=[a.lat,a.lng,b.lat,b.lng].join(',');if(roadCache.has(key))return roadCache.get(key);if(++checks>24)throw Error('The bounded search could not complete a reserve-safe plan. Try more networks or a higher starting charge.');// Address pins use the same 1 km tolerance as the original trip; charger pins stay strict.
+ const road=await loadTerrain(await loadRoad(a,b,{signal,maxSnap:100,startSnap:a===origin?1000:100,endSnap:b===destination?1000:100}),{signal});roadCache.set(key,road);return road;}
  function append(road,ev){for(const p of ev.trace.slice(1))trace.push({km:km+p.km,soc:p.soc});geometry.push(...road.geometry.coordinates);km+=road.distance/1000;minutes+=road.duration/60;energyTotal+=ev.energy;ascent+=ev.ascent;descent+=ev.descent;soc=ev.arrival;}
  for(let step=0;step<=6;step++){
   signal?.throwIfAborted();onStatus(`Checking terrain and reserve for leg ${step+1}…`);
@@ -24,9 +25,12 @@ export async function planCharging(origin,destination,direct,s,{signal,onStatus=
   // Forward, bounded greedy search. Each accepted leg is road-routed and terrain-checked.
   const candidates=pool.filter(p=>p.progress>progress+2&&p.progress-progress<=range*.9&&!stops.some(x=>x.osmId===p.osmId)&&distance(here,p.location)<=range*1.1).sort((a,b)=>b.progress-a.progress);
   const spread=[];for(const c of candidates){if(!spread.some(x=>Math.abs(x.progress-c.progress)<8))spread.push(c);if(spread.length===8)break;}
-  let selected;
-  for(const candidate of spread){onStatus(`Checking access and terrain to ${candidate.name}…`);let leg;try{leg=await getLeg(here,candidate.location);}catch(e){if(e.message.startsWith('No driving route'))continue;throw e;}const ev=terrainEnergy(leg,s,soc);if(meetsReserve(ev,floor)){selected={candidate,leg,ev};break;}}
-  if(!selected)throw Error(`No reserve-safe next stop found (${pool.length} eligible stations; ${spread.length} candidate checks; estimated level-road reach ${Math.round(range)} km) after ${stops.length} selected stop(s)${stops.length?' (last: '+stops.at(-1).name+')':''}. Free coverage may be incomplete. Increase starting charge, reduce speed or allow more networks. No complete itinerary is available.`);
+  let selected,noAccess=0,belowReserve=0;
+  for(const candidate of spread){onStatus(`Checking access and terrain to ${candidate.name}…`);let leg;try{leg=await getLeg(here,candidate.location);}catch(e){if(e.message.startsWith('No driving route')){noAccess++;continue;}throw e;}const ev=terrainEnergy(leg,s,soc);if(meetsReserve(ev,floor)){selected={candidate,leg,ev};break;}belowReserve++;}
+  if(!selected){
+   if(noAccess===spread.length&&spread.length)throw Error(`Could not route to the checked charging stations (${noAccess} road-access failures). This does not mean your battery range is insufficient. Try placing the start pin on a drivable road, or exclude inaccessible stops. No complete plan was exported.`);
+   throw Error(`The limited search did not find a next stop: ${spread.length} candidates checked, ${belowReserve} below the ${floor}% planning floor, ${noAccess} without a driving route. This is not proof the trip is impossible. Try more networks or a different start point. No incomplete plan was exported.`);
+  }
   const {candidate,leg,ev}=selected;append(leg,ev);const target=100,kwh=(target-soc)/100*s.capacity;
   const stop={...candidate,km,arrival:soc,target,kwh,minutes:candidate.power?chargeMinutes(soc,target,candidate.power,s,candidate.chargeKind)+5:null,cost:kwh/.92*s.tariffs[candidate.network]};stops.push(stop);soc=target;trace.push({km,soc});here=candidate.location;progress=candidate.progress;
  }

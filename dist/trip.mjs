@@ -7,9 +7,9 @@ export function estimateTrip(road,s){
  const arrival=s.battery-energy/s.capacity*100;
  return {km,minutes:road.duration/60,rate,energy,arrival,floor,payload:payload(s),rangeToReserve:Math.max(0,(available-s.capacity*floor/100)/rate*100),rangeToEmpty:available/rate*100,chargingNeeded:Math.max(0,energy+s.capacity*floor/100-available)};
 }
-export async function fetchRoad(a,b,{signal,maxSnap=1000}={}){
+export async function fetchRoad(a,b,{signal,maxSnap=1000,startSnap=maxSnap,endSnap=maxSnap}={}){
  const coords=[a,b].map(p=>`${p.lng},${p.lat}`).join(';');
- const response=await fetch(`https://router.project-osrm.org/route/v1/driving/${coords}?overview=full&geometries=geojson&steps=false&radiuses=${maxSnap};${maxSnap}`,{signal});
+ const response=await fetch(`https://router.project-osrm.org/route/v1/driving/${coords}?overview=full&geometries=geojson&steps=false&radiuses=${startSnap};${endSnap}`,{signal});
  const data=await response.json(),road=data.routes?.[0];
  if(!response.ok&&!['NoSegment','NoRoute'].includes(data.code))throw Error('Road routing is temporarily unavailable. Please retry.');
  if(data.code!=='Ok'||!road?.geometry?.coordinates?.length)throw Error('No driving route found near these points. Choose points closer to a road.');
