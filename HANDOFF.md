@@ -13,7 +13,7 @@ Read README.md and AGENTS.md. Keep the app free; do not enable billing, paid API
 - engine.mjs: existing consumption/charge model and historical sample optimizer. google.mjs is unused historical paid adapter.
 
 ## Verified
-27 tests cover energy/reserve/summits, exports, coordinates, terrain increase/ascent, strict station filtering, road leg rechecks, charge jumps, missing-data rejection and Registry/OSM IDs not being sent as Google Place IDs. Browser tests verify real elevation and station responses, not just fixtures. See README for observed coverage limits.
+31 tests cover energy/reserve/summits, exports, coordinates, terrain increase/ascent, strict station filtering, road leg rechecks, charge jumps, missing-data rejection and Registry/OSM IDs not being sent as Google Place IDs. Browser tests verify real elevation and station responses, not just fixtures. See README for observed coverage limits.
 
 ## Constraints and next work
 Maintain the open eŞarjRadar feed attribution and date display. Do not label listed station maximum power as guaranteed connector power. Preserve access/road checks; drivers must confirm station status. Refresh bundled province bounds and dated ŞarjKaç price references with `python3 refresh-data.py`; this uses curl to fetch their openly published JSON endpoints. The tariff reference is not live and does not silently overwrite user tariffs. Check EPDK Şarj@TR/operator apps for actual socket prices and status. No direct EPDK API integration is claimed.
@@ -23,3 +23,8 @@ Improve greedy search to bounded graph search/backtracking and compare target SO
 Do not promise never falling below20%. Enforce the floor at every sampled point; don't check only final arrival. Never silently drop failed elevation or replace failed live data with fixtures. Keep complete export disabled until the whole plan succeeds, and clear it on settings/address changes. Google may choose different roads; preserve this caveat.
 
 Free-service endpoints/attributions/privacy are in README. Review public API usage policy before scale/commercial use. No credentials or original Sites project identity belong in this portable GitHub repository.
+
+## Vehicle profiles
+“My vehicle” manages up to 30 editable profiles saved in localStorage (`ev-route-vehicles-v1`). Existing capacity/consumption migrate into the Atto 3 starter profile. No verified manufacturer catalogue is claimed. Profiles contain name/year, usable capacity, baseline highway consumption, car weight excluding occupants, AC/DC limits and supported connectors (CCS2 / Type 2). Switching updates energy, payload-sensitive terrain, SOC and charger compatibility; existing charging plans are invalidated and replanned. Route distance and traffic-free road time do not change merely because a different car is selected. Reset preserves the active vehicle. The main consumption input updates that profile.
+
+`vehicles.mjs` validates and migrates profiles. Charging taper is a generic curve scaled to the profile DC limit; AC uses its separate limit. A mixed station with only a site maximum has unknown AC power, avoiding use of DC power for AC estimates. No cross-device sync. Browser storage denial means session-only profiles.

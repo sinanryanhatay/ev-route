@@ -5,7 +5,7 @@ Free personal/non-commercial EV trip planner for Turkey. Public app: https://att
 ## Run
 `python3 -m http.server 4173 --directory dist`
 
-`node --test tests/*.test.mjs` — 27 tests. No build step, framework or API keys.
+`node --test tests/*.test.mjs` — 31 tests. No build step, framework or API keys.
 
 ## Current functionality
 - OpenFreeMap / MapLibre road map, Photon address autocomplete and browser current location.
@@ -36,3 +36,8 @@ Charging targets currently use 100% for conservatism and can be slow. Unknown st
 No billing setup, keys, paid fallback, backend storage or account. Preferences stay in local browser storage. Free public services have usage/availability limits. Commercialization needs a fresh service-policy review. Google Maps may choose different roads after handoff and receives stops but no battery targets.
 
 `engine.mjs` retains the old sample optimizer for development/tests. The UI does not run that fixture. `google.mjs` is historical unused code; do not connect billed APIs without explicit owner authorization.
+
+## Vehicle profiles
+“My vehicle” manages up to 30 editable profiles saved in localStorage (`ev-route-vehicles-v1`). Existing capacity/consumption migrate into the Atto 3 starter profile. No verified manufacturer catalogue is claimed. Profiles contain name/year, usable capacity, baseline highway consumption, car weight excluding occupants, AC/DC limits and supported connectors (CCS2 / Type 2). Switching updates energy, payload-sensitive terrain, SOC and charger compatibility; existing charging plans are invalidated and replanned. Route distance and traffic-free road time do not change merely because a different car is selected. Reset preserves the active vehicle. The main consumption input updates that profile.
+
+`vehicles.mjs` validates and migrates profiles. Charging taper is a generic curve scaled to the profile DC limit; AC uses its separate limit. A mixed station with only a site maximum has unknown AC power, avoiding use of DC power for AC estimates. No cross-device sync. Browser storage denial means session-only profiles.
