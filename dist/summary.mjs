@@ -1,0 +1,2 @@
+export function formatDuration(minutes){if(!Number.isFinite(minutes))return 'Unknown';const total=Math.max(0,Math.round(minutes));return `${Math.floor(total/60)}h ${total%60}m`;}
+export function summarizePlan(plan){const known=plan.stops.every(s=>Number.isFinite(s.minutes)&&s.minutes>=0);const charging=known?plan.stops.reduce((sum,s)=>sum+s.minutes,0):null;return {charging,total:charging===null?null:plan.duration+charging,cost:plan.stops.reduce((sum,s)=>sum+s.cost,0),addedEnergy:plan.stops.reduce((sum,s)=>sum+s.kwh,0),stopCount:plan.stops.length};}

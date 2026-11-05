@@ -1,11 +1,13 @@
-import {fetchRoad} from './trip.mjs';
+import {fetchRoad,estimateTrip} from './trip.mjs';
 import {terrainRoad,terrainEnergy,distance} from './terrain.mjs';
 import {fetchStations,eligibleStations} from './chargers.mjs';
 import {chargeMinutes,consumption} from './engine.mjs';
 export function meetsReserve(energy,floor){return energy.minimum>=floor-1e-8;}
 export async function planCharging(origin,destination,direct,s,{signal,onStatus=()=>{},excluded=[],services={}}={}){
+ estimateTrip(direct,s);
  const loadRoad=services.fetchRoad||fetchRoad,loadTerrain=services.terrainRoad||terrainRoad,loadStations=services.fetchStations||fetchStations;
- const floor=Math.max(20,s.reserve)+s.buffer;
+ const floor=Math.max(20,s.reserve)+s.buffer,target=s.chargeTarget??80;
+ if(![80,100].includes(target))throw Error('Choose an 80% or 100% charging target.');
  if(!Number.isFinite(floor)||floor>=100||!Number.isFinite(s.battery)||!Number.isFinite(consumption(s))||s.capacity<=0)throw Error('Check the vehicle and reserve settings.');
  if(s.networks.some(n=>!Number.isFinite(Number(s.tariffs[n]))||Number(s.tariffs[n])<=0))throw Error('Enter a positive assumed tariff for each chosen network.');
  if(s.battery<floor)throw Error(`Starting battery is below the ${floor}% planning floor. Charge before departure.`);
@@ -20,18 +22,19 @@ export async function planCharging(origin,destination,direct,s,{signal,onStatus=
   const range=(soc-floor)/100*s.capacity/consumption(s)*100;
   const endRoad=step===0?direct:distance(here,destination)<=range*1.1?await getLeg(here,destination):null,end=endRoad?terrainEnergy(endRoad,s,soc):null;
   if(end&&meetsReserve(end,floor)){append(endRoad,end);return {stops,trace,distance:km,duration:minutes,energy:energyTotal,ascent,descent,arrival:soc,minimum:Math.min(...trace.map(p=>p.soc)),floor,geometry:{type:'LineString',coordinates:geometry},stationCount:pool?.length||0};}
+  if(target<=floor)throw Error(`The ${target}% charging target must exceed your ${floor}% reserve plus buffer. Choose 100% or lower the buffer/reserve.`);
   if(step===6)break;
   if(!pool){onStatus('Finding real mapped charging stations along the route…');const all=await loadStations(direct,{signal});pool=eligibleStations(all,s).filter(p=>!excluded.includes(p.osmId));if(!pool.length)throw Error(`Found ${all.length} mapped stations, but none with a selected network and the required connector/power. Try disabling fast-only or enabling more networks. Unknown specifications are not assumed.`);}
   // Forward, bounded greedy search. Each accepted leg is road-routed and terrain-checked.
   const candidates=pool.filter(p=>p.progress>progress+2&&p.progress-progress<=range*.9&&!stops.some(x=>x.osmId===p.osmId)&&distance(here,p.location)<=range*1.1).sort((a,b)=>b.progress-a.progress);
   const spread=[];for(const c of candidates){if(!spread.some(x=>Math.abs(x.progress-c.progress)<8))spread.push(c);if(spread.length===8)break;}
   let selected,noAccess=0,belowReserve=0;
-  for(const candidate of spread){onStatus(`Checking access and terrain to ${candidate.name}…`);let leg;try{leg=await getLeg(here,candidate.location);}catch(e){if(e.message.startsWith('No driving route')){noAccess++;continue;}throw e;}const ev=terrainEnergy(leg,s,soc);if(meetsReserve(ev,floor)){selected={candidate,leg,ev};break;}belowReserve++;}
+  for(const candidate of spread){onStatus(`Checking access and terrain to ${candidate.name}…`);let leg;try{leg=await getLeg(here,candidate.location);}catch(e){if(e.message.startsWith('No driving route')){noAccess++;continue;}throw e;}const ev=terrainEnergy(leg,s,soc);if(meetsReserve(ev,floor)&&ev.arrival<target){selected={candidate,leg,ev};break;}belowReserve++;}
   if(!selected){
    if(noAccess===spread.length&&spread.length)throw Error(`Could not route to the checked charging stations (${noAccess} road-access failures). This does not mean your battery range is insufficient. Try placing the start pin on a drivable road, or exclude inaccessible stops. No complete plan was exported.`);
-   throw Error(`The limited search did not find a next stop: ${spread.length} candidates checked, ${belowReserve} below the ${floor}% planning floor, ${noAccess} without a driving route. This is not proof the trip is impossible. Try more networks or a different start point. No incomplete plan was exported.`);
+   throw Error(`The limited search did not find a next stop: ${spread.length} candidates checked, ${belowReserve} below the ${floor}% planning floor, ${noAccess} without a driving route. This is not proof the trip is impossible. Try more networks, a different start point${target===80?", or the 100% charging target":""}. No incomplete plan was exported.`);
   }
-  const {candidate,leg,ev}=selected;append(leg,ev);const target=100,kwh=(target-soc)/100*s.capacity;
+  const {candidate,leg,ev}=selected;append(leg,ev);const kwh=(target-soc)/100*s.capacity;
   const stop={...candidate,km,arrival:soc,target,kwh,minutes:candidate.power?chargeMinutes(soc,target,candidate.power,s,candidate.chargeKind)+5:null,cost:kwh/.92*s.tariffs[candidate.network]};stops.push(stop);soc=target;trace.push({km,soc});here=candidate.location;progress=candidate.progress;
  }
  throw Error('Trip needs more than six stops; shorten the trip into sections. No complete plan was exported.');
