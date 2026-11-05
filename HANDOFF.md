@@ -54,3 +54,6 @@ The repository remains in the owner's account. The brother can fork it to his Gi
 
 
 Latest UI update: removed the Urla demo loader and sample status bar. From/To start empty. The primary action opens Google Maps directions. Unconnected charging-result controls are hidden; the engine and tests remain for continued development. Arbitrary-route EV planning is not implemented.
+
+
+Address autocomplete update: both From and To now use Photon’s public API (550ms debounce, minimum 3 characters, bounded memory cache, abort and stale-response protection). Results have keyboard/touch selection; selected coordinates drive map pins and Google Maps navigation. No key or billing. Photon is a best-effort public demo with reasonable-use limits; OSM POI coverage differs from Google. No paid fallback. Typing search text sends it to Photon. Road/charging planning remains unconnected.
