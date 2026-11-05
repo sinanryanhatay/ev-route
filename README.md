@@ -1,5 +1,7 @@
 # EV Route
 
+**Current status:** Live OSRM road routing and trip metrics are implemented. Use Calculate my trip after choosing both endpoints. The map draws the road route; six cards show distance, driving time, energy, arrival without charging, distance to reserve and extra charging needed. Battery estimates exclude terrain. Automatic verified charging-stop planning is still unfinished. 21 tests pass. See the Live road metrics update below for details; earlier sample-engine notes describe retained development code.
+
 A static EV trip-planning prototype for Turkey, with a real **OpenFreeMap** map and **Google Maps URL navigation**. No API key, billing account or paid Google service is required by the active app.
 
 Public app: https://atto-route-sinan.srh34.chatgpt.site
@@ -52,3 +54,9 @@ Latest UI update: removed the Urla demo loader and sample status bar. From/To st
 
 
 Address autocomplete update: both From and To now use Photon’s public API (550ms debounce, minimum 3 characters, bounded memory cache, abort and stale-response protection). Results have keyboard/touch selection; selected coordinates drive map pins and Google Maps navigation. No key or billing. Photon is a best-effort public demo with reasonable-use limits; OSM POI coverage differs from Google. No paid fallback. Typing search text sends it to Photon. Road/charging planning remains unconnected.
+
+
+## Live road metrics update
+`trip.mjs` now requests an OSRM driving route on explicit Calculate my trip. Both endpoints must be coordinate inputs or selected autocomplete results. The real road line, distance and OSRM time feed a six-card metrics section and a battery-without-charging chart. Vehicle-setting edits recompute locally; endpoint edits clear old results and abort pending requests. Requests time out at 20 seconds, route snapping is limited to 1 km, and failures never use sample routes. Map style reload restores the route line. Google Maps can choose a different route.
+Energy uses the existing level-road consumption model at the chosen speed over the whole distance. It is a speed scenario, not road-segment speed prediction. OSRM time excludes traffic and charging and uses its own speed model. Arrival below zero is shown as Not reachable; charging-needed is battery energy required to finish at reserve + buffer, not grid energy or a verified stop itinerary. Terrain, charging stations, tariffs and charging time remain unconnected. Public OSRM service is best-effort, no key/billing; coordinates are sent only on calculation. No paid fallback.
+21 tests pass, including real-route metric unit conversions, reserve energy balance, unreachable trips and settings validation.
