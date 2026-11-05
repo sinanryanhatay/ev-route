@@ -9,7 +9,7 @@ const road=(km,rise=0)=>({distance:km*1000,duration:km*60,geometry:{type:'LineSt
 test('terrain raises energy for a hill and checks every sample reserve',()=>{const flat=terrainEnergy(road(100),DEFAULTS),hill=terrainEnergy(road(100,1000),DEFAULTS);assert.ok(hill.energy>flat.energy);assert.equal(hill.ascent,1000);assert.equal(hill.descent,1000);assert.equal(meetsReserve({minimum:19.99},20),false);});
 test('route sampling retains endpoints and road distance',()=>{const r=road(30);const samples=sampleRoad(r);assert.equal(samples[0].km,0);assert.equal(samples.at(-1).km,30);assert.ok(samples.length<=100);});
 test('charger filters never assume unknown network, connector or DC power',()=>{const raw=[{type:'node',id:1,lat:40,lon:29,tags:{operator:'ZES','socket:type2_combo':'2','socket:type2_combo:output':'180 kW'}},{type:'node',id:2,lat:40,lon:29,tags:{operator:'ZES'}},{type:'node',id:3,lat:40,lon:29,tags:{operator:'Trugo',access:'private','socket:type2_combo':'2','socket:type2_combo:output':'180 kW'}}];const s=parseStations(raw);assert.equal(s.length,2);assert.equal(eligibleStations(s,DEFAULTS).length,1);assert.equal(parsePower('150000 W; 180 kW'),180);assert.equal(parsePower('unknown'),0);const u=new URL(exportTrip('A','B',s.slice(0,1)).full);assert.equal(u.searchParams.has('waypoint_place_ids'),false);});
-test('actual legs are rechecked and charging jumps preserve the floor',async()=>{const a={lat:40,lng:29},b={lat:40,lng:30},c={lat:40,lng:29.1};const stations=[{osmId:'node/1',name:'Real mapped fixture',network:'ZES',location:c,ccs:true,power:100,progress:100}];let calls=0;const services={fetchStations:async()=>stations,terrainRoad:async r=>r,fetchRoad:async()=>{calls++;return road(100,100);}};const p=await planCharging(a,b,road(300),DEFAULTS,{services});assert.equal(p.stops.length,1);assert.ok(p.minimum>=25);assert.equal(p.stops[0].target,100);assert.equal(calls,2);assert.equal(p.distance,200);});
+test('actual legs are rechecked and charging jumps preserve the floor',async()=>{const a={lat:40,lng:29},b={lat:40,lng:30},c={lat:40,lng:29.1};const stations=[{osmId:'node/1',name:'Real mapped fixture',network:'ZES',location:c,ccs:true,power:100,progress:100}];let calls=0;const services={fetchStations:async()=>stations,terrainRoad:async r=>r,fetchRoad:async()=>{calls++;return road(100,100);}};const p=await planCharging(a,b,road(300),DEFAULTS,{services});assert.equal(p.stops.length,1);assert.ok(p.minimum>=25);assert.equal(p.stops[0].target,80);assert.equal(calls,2);assert.equal(p.distance,200);});
 test('insufficient data or initial reserve cannot create an exportable plan',async()=>{await assert.rejects(planCharging({},{},road(300),{...DEFAULTS,battery:10}),/Starting battery/);await assert.rejects(planCharging({lat:40,lng:29},{lat:40,lng:30},road(300),DEFAULTS,{services:{fetchStations:async()=>[]}}),/none/);});
 
 test('EPDK-derived registry preserves dated specifications without treating prices as live',async()=>{
@@ -33,4 +33,25 @@ test('OSRM request carries independent address and charger search radiuses',asyn
  const {fetchRoad}=await import('../dist/trip.mjs');const original=globalThis.fetch;const urls=[];
  globalThis.fetch=async url=>{urls.push(new URL(url));return {ok:true,json:async()=>({code:'Ok',routes:[road(1)]})};};
  try{await fetchRoad({lat:41,lng:29},{lat:40,lng:29},{maxSnap:100,startSnap:1000});await fetchRoad({lat:40,lng:29},{lat:37,lng:28},{maxSnap:100,endSnap:1000});assert.equal(urls[0].searchParams.get('radiuses'),'1000;100');assert.equal(urls[1].searchParams.get('radiuses'),'100;1000');}finally{globalThis.fetch=original;}
+});
+
+for (const target of [80,100]) test(`charging target ${target}% controls energy, time, cost and departure trace`,async()=>{
+ const a={lat:40,lng:29},b={lat:40,lng:30},c={lat:40,lng:29.1};
+ const services={fetchStations:async()=>[{osmId:'target',name:'Fixture',network:'ZES',location:c,ccs:true,power:100,progress:100}],terrainRoad:async r=>r,fetchRoad:async()=>road(100)};
+ const s={...DEFAULTS,chargeTarget:target};const p=await planCharging(a,b,road(300),s,{services});
+ const stop=p.stops[0];assert.equal(stop.target,target);assert.ok(Math.abs(stop.kwh-(target-stop.arrival)/100*s.capacity)<1e-8);assert.ok(stop.minutes>0);assert.ok(Math.abs(stop.cost-stop.kwh/.92*s.tariffs.ZES)<1e-8);assert.ok(p.trace.some(x=>x.km===stop.km&&x.soc===target));assert.ok(p.minimum>=25);
+});
+test('unsupported targets and targets below the reserve cannot produce charging plans',async()=>{
+ const a={lat:40,lng:29},b={lat:40,lng:30};
+ await assert.rejects(()=>planCharging(a,b,road(300),{...DEFAULTS,chargeTarget:90}),/80% or 100%/);
+ await assert.rejects(()=>planCharging(a,b,road(300),{...DEFAULTS,chargeTarget:80,reserve:80,buffer:5}),/must exceed/);
+});
+test('80% target can require an extra stop while both plans maintain the reserve',async()=>{
+ const a={lat:40,lng:29},b={lat:40,lng:29.27};const stations=[100,200].map(km=>({osmId:String(km),name:'Fixture '+km,network:'ZES',location:{lat:40,lng:29+km/1000},ccs:true,power:100,progress:km}));
+ const services={fetchStations:async()=>stations,terrainRoad:async r=>r,fetchRoad:async(from,to)=>road(Math.abs(to.lng-from.lng)*1000)};
+ const p80=await planCharging(a,b,road(270),{...DEFAULTS,chargeTarget:80},{services}),p100=await planCharging(a,b,road(270),{...DEFAULTS,chargeTarget:100},{services});
+ assert.equal(p80.stops.length,2);assert.equal(p100.stops.length,1);assert.ok(p80.stops.every(s=>s.target===80));assert.ok(p100.stops.every(s=>s.target===100));assert.ok(p80.minimum>=25&&p100.minimum>=25);
+});
+test('missing, partial and backwards terrain cannot silently pass reserve checks',()=>{
+ for(const profile of [undefined,[],[{km:0,elevation:0}],[{km:0,elevation:0},{km:20,elevation:NaN}],[{km:0,elevation:0},{km:30,elevation:0},{km:20,elevation:0}],[{km:0,elevation:0},{km:10,elevation:0}]])assert.throws(()=>terrainEnergy({...road(20),profile},DEFAULTS),/incomplete/);
 });
