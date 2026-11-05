@@ -2,9 +2,11 @@
 
 A dependency-free, mobile-friendly first version of a personal BYD Atto 3 route planner.
 
+Start with [HANDOFF.md](HANDOFF.md) for the owner’s zero-charge requirement, known limitations, and a ready-to-paste prompt for Claude Code or Codex. Sending stops to Google Maps via URL is free and requires no API key.
+
 Run locally: `python3 -m http.server 4173 --directory dist`
 
-Run tests: `node --test tests/engine.test.mjs`
+Run tests: `node --test tests/*.test.mjs`
 
 ## Included
 
@@ -17,9 +19,9 @@ Run tests: `node --test tests/engine.test.mjs`
 - Optional Google Maps JS integration: real route geometry, sampled elevation, charger discovery, rerouting through selected stops and reserve revalidation.
 - Preferences in localStorage. Google key only in the active page, not persisted.
 
-## Live Google setup
+## Optional Google adapter — not enabled
 
-Enable billing and Maps JavaScript API, Routes API, Places API (New), Elevation API in a Google Cloud project. Use an HTTP-referrer-restricted browser key limited to the deployed site's origin and those APIs. Enter it in Connect Google Maps. Never use an unrestricted server key here. Route planning issues multiple billed requests. Set project quotas.
+The owner requires a zero-charge solution. Do not enable billing or this potentially billed adapter without new explicit authorization. It is retained as unverified optional code only. The adapter would require Maps JavaScript API, Routes API, Places API (New), and Elevation API in a Google Cloud project. Use an HTTP-referrer-restricted browser key limited to the deployed site's origin and those APIs. Enter it in Connect Google Maps. Never use an unrestricted server key here. Route planning issues multiple billed requests. Set project quotas.
 
 Live integration is implemented against the current Google documentation but has NOT been end-to-end verified with a paid API key. API access, billing, domain restrictions and regional charger data may affect it. Failed discovery/elevation/access validation shows an error; it never silently substitutes sample data.
 
@@ -37,7 +39,7 @@ Live search samples up to 25 areas within 25 km radii and requires identifiable 
 
 ## Verification
 
-10 Node tests cover reserve constraints, summit energy, payload override, weight/speed/wind effects, no-stop journeys, network exclusions, charging caps, invalid inputs and objective optimization. Browser checks covered initial rendering, passenger/luggage recalculation, changed destination rejection and the Google connection dialog. Live API calls require a user-provided key and remain unverified.
+15 Node tests cover reserve constraints, summit energy, payload override, weight/speed/wind effects, no-stop journeys, network exclusions, charging caps, invalid inputs and objective optimization. Browser checks covered initial rendering, passenger/luggage recalculation, changed destination rejection and the Google connection dialog. Live API calls require a user-provided key and remain unverified.
 
 ## Google Maps export
 The selected itinerary exports origin, destination and every selected charger in order. Place IDs are included when available. One link supports at most nine intermediate stops and 2,048 characters. Mobile-safe chunks use at most three intermediate waypoints, preserving continuity and never dropping stops. Changed inputs disable export until recalculation. Sample exports are explicitly unverified. The schematic map has been removed; without a Google key the map area presents setup instructions instead of invented geometry.
