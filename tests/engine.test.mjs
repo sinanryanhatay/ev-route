@@ -1,0 +1,14 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {DEFAULTS,SAMPLE,plan,payload,consumption,segmentEnergy,legEnergy,chargeMinutes} from '../dist/engine.mjs';
+const settings=()=>structuredClone(DEFAULTS);
+test('sample plan meets reserve at every segment and charging stop',()=>{const s=settings(),p=plan(SAMPLE,s);let previous=0,soc=s.battery;assert.ok(p.stops.length>0);for(const stop of [...p.stops,{km:SAMPLE.distance}]){const e=legEnergy(SAMPLE,previous,stop.km,s);assert.ok(soc-e.peak/s.capacity*100>=p.floor-1e-8);if(stop.target){assert.ok(stop.target>stop.arrival);assert.ok(stop.target<=100);soc=stop.target;}previous=stop.km;}assert.ok(p.arrival>=p.floor);});
+test('payload counts occupants and luggage, override replaces both',()=>{const s=settings();assert.equal(payload(s),170);s.payloadOverride='310';assert.equal(payload(s),310);});
+test('extra weight increases level and uphill energy',()=>{const light=settings(),heavy={...light,people:5,luggage:100};assert.ok(consumption(heavy)>consumption(light));assert.ok(segmentEnergy(50,800,heavy)>segmentEnergy(50,800,light));});
+test('speed and headwind increase consumption',()=>{const s=settings();assert.ok(consumption({...s,speed:140})>consumption(s));assert.ok(consumption({...s,headwind:20})>consumption(s));});
+test('reserve protects a summit even if endpoint is lower',()=>{const s={...settings(),battery:30,reserve:20,buffer:5};const r={distance:20,source:'sample',duration:20,stations:[],profile:[{km:0,elevation:0},{km:10,elevation:1500},{km:20,elevation:0}]};assert.throws(()=>plan(r,s),/No plan/);});
+test('unsupported network or excluded stations cannot appear',()=>{const s={...settings(),networks:['ZES']};const p=plan(SAMPLE,s,['gemlik-lumicle']);assert.ok(p.stops.every(x=>x.network==='ZES'));assert.throws(()=>plan(SAMPLE,{...s,networks:['Astor']}),/No plan/);});
+test('short trip needs no charging and has zero charging cost',()=>{const r={distance:20,duration:20,source:'sample',stations:[],profile:[{km:0,elevation:0},{km:20,elevation:0}]};const p=plan(r,settings());assert.equal(p.stops.length,0);assert.equal(p.cost,0);});
+test('car limits charging speed, not charger nameplate',()=>{const s=settings();assert.equal(chargeMinutes(30,80,180,s),chargeMinutes(30,80,400,s));assert.ok(chargeMinutes(30,80,11,s)>chargeMinutes(30,80,180,s));});
+test('invalid or insufficient battery is rejected',()=>{assert.throws(()=>plan(SAMPLE,{...settings(),battery:20}));assert.throws(()=>plan(SAMPLE,{...settings(),payloadOverride:'oops'}));assert.throws(()=>plan(SAMPLE,{...settings(),networks:[]}));});
+test('optimization respects priority among sampled choices',()=>{const s=settings();s.tariffs={ZES:25,Lumicle:5,Astor:15,WAT:10,Trugo:10};const fast=plan(SAMPLE,{...s,priority:'fastest'}),cheap=plan(SAMPLE,{...s,priority:'cheapest'});assert.ok(cheap.cost<=fast.cost+1e-7);assert.ok(fast.minutes<=cheap.minutes+1e-7);});
